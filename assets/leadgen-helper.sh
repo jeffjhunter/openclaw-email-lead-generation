@@ -8,6 +8,9 @@
 #
 # Commands:
 #   init                          — Create workspace directories
+#   dir                           — Print the resolved leadgen data directory
+#   workspace                     — Print the resolved OpenClaw workspace root
+#   migrate                       — Move a legacy ~/workspace/leadgen install into the resolved workspace
 #   write-config <file>           — Write config from stdin (heredoc)
 #   add-lead <json_file>          — Validate and write a lead JSON file
 #   update-lead <lead_id> <field> <value> — Update a single field in a lead
@@ -27,14 +30,78 @@
 #   sanitize-string <string>      — Echo sanitized version of input
 #
 # Security:
-#   - All paths validated to stay within ~/workspace/leadgen/
+#   - All paths validated to stay within the resolved leadgen data directory
 #   - All string inputs stripped of shell metacharacters
 #   - JSON validated with jq (if available) or basic checks
 #   - No eval, no unquoted variables, no command substitution on user input
 
 set -euo pipefail
 
-LEADGEN_DIR="${HOME}/workspace/leadgen"
+# ──────────────────────────────────────────────
+# WORKSPACE RESOLUTION (current OpenClaw)
+#
+# Data lives in <openclaw-workspace>/leadgen. The workspace is resolved the
+# same way OpenClaw resolves it (docs.openclaw.ai/concepts/agent-workspace):
+#   1. $OPENCLAW_WORKSPACE_DIR, when set
+#   2. agents.defaults.workspace in ~/.openclaw/openclaw.json (best effort)
+#   3. ~/.openclaw-$OPENCLAW_PROFILE/workspace for non-default profiles
+#   4. ~/.openclaw/workspace (default)
+#
+# Compatibility: installs created before this resolver existed keep their
+# data at the legacy ~/workspace/leadgen. When that directory exists and the
+# resolved one does not, the helper keeps using the legacy directory and
+# prints a notice. Run `leadgen-helper.sh migrate` to move the data into the
+# resolved workspace. Setting $LEADGEN_DIR overrides everything (escape
+# hatch for custom layouts).
+# ──────────────────────────────────────────────
+
+expand_tilde() {
+  local p="$1"
+  case "$p" in
+    "~")   printf '%s' "$HOME" ;;
+    "~/"*) printf '%s/%s' "$HOME" "${p#"~/"}" ;;
+    *)     printf '%s' "$p" ;;
+  esac
+}
+
+resolve_workspace() {
+  if [[ -n "${OPENCLAW_WORKSPACE_DIR:-}" ]]; then
+    expand_tilde "$OPENCLAW_WORKSPACE_DIR"
+    return 0
+  fi
+  local cfg="${OPENCLAW_STATE_DIR:-${HOME}/.openclaw}/openclaw.json"
+  if [[ -f "$cfg" ]]; then
+    local ws=""
+    ws=$(grep -m1 -E '"?workspace"?[[:space:]]*:' "$cfg" 2>/dev/null | sed -E "s/.*\"?workspace\"?[[:space:]]*:[[:space:]]*[\"']([^\"']+)[\"'].*/\1/") || ws=""
+    if [[ -n "$ws" && "$ws" != *'"'* && "$ws" != *'{'* ]]; then
+      expand_tilde "$ws"
+      return 0
+    fi
+  fi
+  if [[ -n "${OPENCLAW_PROFILE:-}" && "${OPENCLAW_PROFILE}" != "default" ]]; then
+    printf '%s/.openclaw-%s/workspace' "$HOME" "$OPENCLAW_PROFILE"
+    return 0
+  fi
+  printf '%s/.openclaw/workspace' "$HOME"
+}
+
+WORKSPACE_DIR="$(resolve_workspace)"
+LEGACY_LEADGEN_DIR="${HOME}/workspace/leadgen"
+
+if [[ -n "${LEADGEN_DIR:-}" ]]; then
+  LEADGEN_DIR="$(expand_tilde "$LEADGEN_DIR")"
+else
+  LEADGEN_DIR="${WORKSPACE_DIR}/leadgen"
+  if [[ "$LEADGEN_DIR" != "$LEGACY_LEADGEN_DIR" && -d "$LEGACY_LEADGEN_DIR" ]]; then
+    if [[ ! -d "$LEADGEN_DIR" ]]; then
+      echo "NOTE: Existing install found at legacy path ${LEGACY_LEADGEN_DIR}; continuing to use it." >&2
+      echo "      Run 'leadgen-helper.sh migrate' to move data to ${LEADGEN_DIR}." >&2
+      LEADGEN_DIR="$LEGACY_LEADGEN_DIR"
+    else
+      echo "NOTE: Using ${LEADGEN_DIR}. A legacy install still exists at ${LEGACY_LEADGEN_DIR}." >&2
+    fi
+  fi
+fi
 LEADS_ACTIVE="${LEADGEN_DIR}/leads/active"
 LEADS_ARCHIVE="${LEADGEN_DIR}/leads/archive"
 TEMPLATES_DIR="${LEADGEN_DIR}/templates"
@@ -143,7 +210,8 @@ cmd_init() {
     "${REPORTS_DIR}/daily" \
     "${REPORTS_DIR}/weekly" \
     "${REPORTS_DIR}/monthly" \
-    "${DRAFTS_DIR}"
+    "${DRAFTS_DIR}" \
+    "${LEADGEN_DIR}/campaigns"
   echo "✅ Workspace created at ${LEADGEN_DIR}"
 }
 
@@ -202,7 +270,12 @@ cmd_update_lead() {
   # Sanitize the field name
   local safe_field
   safe_field=$(printf '%s' "$field" | tr -cd 'a-zA-Z0-9_.')
-  
+
+  # Status updates must use a defined pipeline stage
+  if [[ "$safe_field" == "status" ]]; then
+    validate_status "$value"
+  fi
+
   # Sanitize the value
   local safe_value
   safe_value=$(sanitize_string "$value" 1000)
@@ -566,12 +639,46 @@ cmd_check_warmup() {
   esac
 }
 
+cmd_dir() {
+  # Print the resolved leadgen data directory (stdout only; notices go to stderr).
+  printf '%s\n' "$LEADGEN_DIR"
+}
+
+cmd_workspace() {
+  # Print the resolved OpenClaw workspace root (stdout only).
+  printf '%s\n' "$WORKSPACE_DIR"
+}
+
+cmd_migrate() {
+  # Move an existing legacy install (~/workspace/leadgen) into the resolved
+  # OpenClaw workspace. Refuses to overwrite anything.
+  local target="${WORKSPACE_DIR}/leadgen"
+  if [[ ! -d "$LEGACY_LEADGEN_DIR" ]]; then
+    echo "No legacy install found at ${LEGACY_LEADGEN_DIR} — nothing to migrate."
+    return 0
+  fi
+  if [[ "$target" == "$LEGACY_LEADGEN_DIR" ]]; then
+    echo "Resolved data directory is already ${LEGACY_LEADGEN_DIR} — nothing to migrate."
+    return 0
+  fi
+  if [[ -e "$target" ]]; then
+    echo "ERROR: ${target} already exists. Move or merge it manually before migrating." >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$target")"
+  mv "$LEGACY_LEADGEN_DIR" "$target"
+  echo "✅ Migrated ${LEGACY_LEADGEN_DIR} → ${target}"
+}
+
 # ──────────────────────────────────────────────
 # MAIN DISPATCH
 # ──────────────────────────────────────────────
 
 case "${1:-}" in
   init)              cmd_init ;;
+  dir)               cmd_dir ;;
+  workspace)         cmd_workspace ;;
+  migrate)           cmd_migrate ;;
   write-config)      cmd_write_config ;;
   add-lead)          cmd_add_lead "${2:?ERROR: json_file required}" ;;
   update-lead)       cmd_update_lead "${2:?ERROR: lead_id required}" "${3:?ERROR: field required}" "${4:?ERROR: value required}" ;;
@@ -595,6 +702,9 @@ case "${1:-}" in
     echo ""
     echo "Commands:"
     echo "  init                            Create workspace directories"
+    echo "  dir                             Print resolved leadgen data directory"
+    echo "  workspace                       Print resolved OpenClaw workspace root"
+    echo "  migrate                         Move legacy ~/workspace/leadgen into the resolved workspace"
     echo "  write-config                    Write config from stdin"
     echo "  add-lead <json_file>            Validate and write lead"
     echo "  update-lead <id> <field> <val>  Update lead field"
