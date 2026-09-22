@@ -54,8 +54,9 @@ Mitigation: Consider fixing those issues before enabling SMTP sending or cron au
 
 ## Skill Version(s):
 
-1.0.1 (source: frontmatter, artifact/_meta.json, release metadata)
+1.1.0 (source: frontmatter, artifact/_meta.json, release metadata)
 
 ## Ethical Considerations:
 
 Users should evaluate whether this skill is appropriate for their environment, review any generated or modified files before relying on them, and apply their organization's safety, security, and compliance requirements before deployment.
+
