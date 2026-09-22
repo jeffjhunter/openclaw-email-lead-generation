@@ -10,6 +10,7 @@ Tier 3 sets up 4 cron jobs via `openclaw cron add`. Each job triggers the agent 
 
 **Prerequisites:**
 - Tier 1 (Pipeline Tracker) must be set up
+- Resolve the data directory once per run: `LEADGEN_DIR` is the output of `"$LEADGEN_DIR/helper.sh" dir` (or `assets/leadgen-helper.sh dir`). Substitute the literal path wherever `$LEADGEN_DIR` appears below.
 - Tier 2 (Outreach Engine) must be set up for midday sends
 - `openclaw` CLI must be available
 - `cron.enabled: true` in config
@@ -53,7 +54,7 @@ If email method is `manual`:
 ```bash
 # Find leads with next_action_date in the past
 today=$(date +%Y-%m-%d)
-for f in ~/workspace/leadgen/leads/active/*.json; do
+for f in "$LEADGEN_DIR"/leads/active/*.json; do
   next_date=$(grep -o '"next_action_date": "[^"]*"' "$f" | cut -d'"' -f4)
   if [[ "$next_date" < "$today" ]] && [[ -n "$next_date" ]]; then
     lead_name=$(grep -o '"name": "[^"]*"' "$f" | head -1 | cut -d'"' -f4)
@@ -73,7 +74,7 @@ For each reply with actionable sentiment:
 - **Question:** Draft an answer based on business context from config
 - **Objection:** Draft a rebuttal aligned with the user's voice
 
-Save drafts to `~/workspace/leadgen/drafts/` for user review.
+Save drafts to `$LEADGEN_DIR/drafts/` for user review.
 
 ---
 
@@ -85,7 +86,7 @@ Save drafts to `~/workspace/leadgen/drafts/` for user review.
 
 ```bash
 today=$(date +%Y-%m-%d)
-for f in ~/workspace/leadgen/leads/active/*.json; do
+for f in "$LEADGEN_DIR"/leads/active/*.json; do
   # Check: sequence active, not paused, next_action_date is today or past
   active=$(grep -o '"active": [a-z]*' "$f" | head -1 | awk '{print $2}')
   paused=$(grep -o '"paused": [a-z]*' "$f" | head -1 | awk '{print $2}')
@@ -167,7 +168,7 @@ Status changes: [list of lead → new_status]
 
 - Count follow-ups due tomorrow
 - Count overdue actions
-- Count pending drafts in `~/workspace/leadgen/drafts/`
+- Count pending drafts in `$LEADGEN_DIR/drafts/`
 
 **Step 4: Generate Summary**
 
@@ -175,7 +176,7 @@ Use the Evening Summary format from main SKILL.md.
 
 **Step 5: Save Report**
 
-Write to `~/workspace/leadgen/reports/daily/[YYYY-MM-DD].md`
+Write to `$LEADGEN_DIR/reports/daily/[YYYY-MM-DD].md`
 
 ---
 
@@ -185,7 +186,7 @@ Write to `~/workspace/leadgen/reports/daily/[YYYY-MM-DD].md`
 
 **Step 1: Aggregate Weekly Data**
 
-Read daily reports from the past 7 days in `~/workspace/leadgen/reports/daily/`.
+Read daily reports from the past 7 days in `$LEADGEN_DIR/reports/daily/`.
 If daily reports are missing, scan lead files directly.
 
 **Step 2: Calculate Metrics**
@@ -208,7 +209,7 @@ For each template:
 
 **Step 4: Compare to Last Week**
 
-Read last week's report from `~/workspace/leadgen/reports/weekly/`.
+Read last week's report from `$LEADGEN_DIR/reports/weekly/`.
 Calculate ↑/↓ trends for each metric.
 
 **Step 5: Identify Issues**
@@ -227,7 +228,7 @@ Based on data:
 
 **Step 7: Save Report**
 
-Write to `~/workspace/leadgen/reports/weekly/[YYYY-MM-DD].md`
+Write to `$LEADGEN_DIR/reports/weekly/[YYYY-MM-DD].md`
 
 ---
 
@@ -258,3 +259,4 @@ openclaw cron add --name "leadgen-morning" --cron "0 8 * * *" --session isolated
 ---
 
 *Autopilot — Your agent works the pipeline while you sleep.* ⚡
+
