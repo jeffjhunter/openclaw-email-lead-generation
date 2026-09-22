@@ -11,7 +11,7 @@
   <a href="https://jeffjhunter.com/humans-and-ai"><strong>Get implementation help</strong></a>
 </p>
 
-> A private, review-stage OpenClaw skill from [Jeff J Hunter](https://jeffjhunter.com/), creator of the [AI Persona Method](https://aipersonamethod.com/).
+> An OpenClaw skill from [Jeff J Hunter](https://jeffjhunter.com/), creator of the [AI Persona Method](https://aipersonamethod.com/).
 
 ## The outcome
 
@@ -48,9 +48,10 @@ A skill handles one job. An AI Employee needs a role, operating rules, context, 
 
 ## Safety and review
 
-This repository is staged privately for review. Keep a human in charge of claims, approvals, publishing, sending, access, and business commitments.
+Keep a human in charge of claims, approvals, publishing, sending, access, and business commitments.
 
 ---
 
 <p align="center"><strong>Build it yourself. Get guided help. Or get help implementing it.</strong></p>
 <p align="center"><a href="https://aimoneygroup.com/">AI Money Group</a> · <a href="https://jeffjhunter.com/humans-and-ai">Implementation paths</a> · <a href="https://jeffjhunter.com/openclaw">More OpenClaw resources</a></p>
+
