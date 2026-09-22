@@ -11,11 +11,11 @@ Template Forge creates a 4-email outreach sequence through a conversational inte
 **Output:** 4 email templates + 1 sequence definition
 **Time:** ~5-10 minutes
 **Files created:**
-- `~/workspace/leadgen/templates/initial_outreach.json`
-- `~/workspace/leadgen/templates/followup_1.json`
-- `~/workspace/leadgen/templates/followup_2.json`
-- `~/workspace/leadgen/templates/followup_3.json`
-- `~/workspace/leadgen/sequences/default.json`
+- `$LEADGEN_DIR/templates/initial_outreach.json`
+- `$LEADGEN_DIR/templates/followup_1.json`
+- `$LEADGEN_DIR/templates/followup_2.json`
+- `$LEADGEN_DIR/templates/followup_3.json`
+- `$LEADGEN_DIR/sequences/default.json`
 
 ---
 
@@ -275,10 +275,10 @@ timing, or redo specific ones. Say "save" when you're happy.
 
 ## Saving Templates
 
-Write each template as a JSON file to `~/workspace/leadgen/templates/`:
+Write each template as a JSON file to `$LEADGEN_DIR/templates/`:
 
 ```bash
-cat << 'EOF' > ~/workspace/leadgen/templates/initial_outreach.json
+cat << 'EOF' > "$LEADGEN_DIR/templates/initial_outreach.json"
 {
   "template_id": "[generate 8-char hex]",
   "template_name": "initial_outreach",
@@ -298,7 +298,7 @@ Repeat for `followup_1.json`, `followup_2.json`, `followup_3.json`.
 Then create the sequence definition:
 
 ```bash
-cat << 'EOF' > ~/workspace/leadgen/sequences/default.json
+cat << 'EOF' > "$LEADGEN_DIR/sequences/default.json"
 {
   "sequence_id": "[generate 8-char hex]",
   "sequence_name": "default",
@@ -346,3 +346,4 @@ When user says "edit template [name]":
 ---
 
 *Template Forge — Because generic cold emails get generic cold shoulders.* 🔥
+
